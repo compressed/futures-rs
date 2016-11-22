@@ -27,8 +27,16 @@ fn send2(n: u32, mut sender: futures::sync::mpsc::UnboundedSender<u32>) {
     send2(n - 1, sender)
 }
 
+fn send3(n: u32, mut sender: futures::sync::mpsc::unbounded_crossbeam::Sender<u32>) {
+    if n == 0 {
+        return;
+    }
+    sender.send(n).unwrap();
+    send3(n - 1, sender)
+}
+
 #[bench]
-fn bench_multi_new(b: &mut Bencher) {
+fn bench_multi_mutex(b: &mut Bencher) {
     b.iter(|| {
         let (tx, rx) = unbounded();
 
@@ -38,6 +46,25 @@ fn bench_multi_new(b: &mut Bencher) {
         thread::spawn(move || send(amt, tx));
         thread::spawn(move || send(amt, tx2));
         thread::spawn(move || send(amt, tx3));
+        let mut rx = rx.wait();
+        for _ in 1..(amt * 3 + 1) {
+            assert!(rx.next().is_some());
+        }
+        assert_eq!(rx.next(), None);
+    });
+}
+
+#[bench]
+fn bench_multi_crossbeam(b: &mut Bencher) {
+    b.iter(|| {
+        let (tx, rx) = futures::sync::mpsc::unbounded_crossbeam::unbounded();
+
+        let tx2 = tx.clone();
+        let tx3 = tx.clone();
+        let amt = 40;
+        thread::spawn(move || send3(amt, tx));
+        thread::spawn(move || send3(amt, tx2));
+        thread::spawn(move || send3(amt, tx3));
         let mut rx = rx.wait();
         for _ in 1..(amt * 3 + 1) {
             assert!(rx.next().is_some());
