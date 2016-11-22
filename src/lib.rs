@@ -194,6 +194,7 @@ pub use future::{
 };
 
 if_std! {
+    extern crate crossbeam;
     mod lock;
     mod task_impl;
     mod stack;
